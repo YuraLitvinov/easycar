@@ -15,6 +15,8 @@ pub enum GenericClientError {
     ReqwestError(#[from] reqwest::Error),
     #[error(transparent)]
     JWTError(#[from] JWTError),
+    #[error("Validation error: {0}")]
+    ValidationError(String),
 }
 
 #[derive(Error, Debug)]
@@ -65,6 +67,20 @@ pub enum CsrfTokenError {
 
 #[derive(Error, Debug)]
 pub enum EnrollError {
+    #[error(transparent)]
+    NoBearer(#[from] NoBearerError),
+    #[error(transparent)]
+    ReqwestError(#[from] reqwest::Error),
+    #[error(transparent)]
+    JWTError(#[from] JWTError),
+    #[error(transparent)]
+    GenericEndpointError(#[from] GenericEndpointError),
+    #[error("The supplied argument ({0}) is empty")]
+    EmptyArg(String),
+}
+
+#[derive(Error, Debug)]
+pub enum TachoError {
     #[error(transparent)]
     NoBearer(#[from] NoBearerError),
     #[error(transparent)]

@@ -1,5 +1,9 @@
 [workspace]
-members = ["easycar", "info-car-api"]
+<<<<<<< HEAD
+members = ["easycar", "easycar-server", "info-car-api"]
+=======
+members = ["easycar", "info-car-api", "easycar-server"]
+>>>>>>> 71c98ec439dccf8f2a853bd00ff24c207c8d8146
 resolver = "2"
 
 [profile.release]
@@ -10,3 +14,14 @@ lto = true
 inherits = "release"
 strip = false
 debug = true
+
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = 1 }
+as_conversions = "warn"
+nursery = { level = "warn", priority = 1 }
+unwrap_used = "deny"
+expect_used = "deny"
+print_stdout = "deny"
+similar_names = { level = "allow", priority = 2 }

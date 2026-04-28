@@ -5,3 +5,4 @@
 Secrets*.toml
 .shuttle*
 /target
+easycar-server/.env

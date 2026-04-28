@@ -1,0 +1,25 @@
+[package]
+name = "easycar-server"
+description = "An Axum-based REST API server for info-car.pl functionality"
+version = "0.1.0"
+edition = "2024"
+license = "LGPL-3.0-only"
+
+[dependencies]
+info-car-api = { path = "../info-car-api" }
+chrono = { version = "0.4.40", features = ["serde"] }
+log = "0.4.26"
+serde = { version = "1.0.219", features = ["derive"] }
+snafu = "0.8"
+reqwest = { version = "=0.12.15", default-features = false, features = ["json", "rustls-tls"] }
+serde_json = "1.0.140"
+thiserror = "2.0.11"
+tokio = { version = "1.48.0", features = ["full"] }
+axum = { version = "0.8.4", features = ["json"] }
+tower = "0.5.2"
+tower-http = { version = "0.6.2", features = ["cors", "trace"] }
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+dotenvy = "0.15.7"
+dotenv = "0.15.0"
+

@@ -7,6 +7,7 @@ use chrono::{DateTime, Duration, Utc};
 use reqwest::ClientBuilder;
 use scraper::{Html, Selector};
 use serde::Deserialize;
+use serde_json::Value;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct UserInfo {
@@ -22,6 +23,7 @@ pub struct Client {
     client: reqwest::Client,
     token: Option<String>,
     pub token_expire_date: Option<DateTime<Utc>>,
+    turnstile_token: Option<String>,
 }
 
 impl Client {
@@ -34,7 +36,21 @@ impl Client {
                 .unwrap(),
             token: None,
             token_expire_date: None,
+            turnstile_token: None,
         }
+    }
+
+    pub fn set_turnstile_token(&mut self, token: Option<String>) {
+        self.turnstile_token = token;
+    }
+
+    fn add_turnstile_header(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+        if let Some(token) = &self.turnstile_token {
+            if !token.is_empty() {
+                return request.header("X-CF-Turnstile", token);
+            }
+        }
+        request
     }
 
     pub fn set_token(&mut self, token: String) {
@@ -120,11 +136,14 @@ impl Client {
             ("_csrf", &csrf_token),
         ];
 
-        self.client
+        let login_response = self
+            .client
             .post("https://info-car.pl/oauth2/login")
             .form(&form_params)
             .send()
             .await?;
+
+        dbg!("Login response: {:?}", login_response);
 
         self.refresh_token().await?;
 
@@ -324,10 +343,125 @@ impl Client {
             .await?
             .ok()?)
     }
+
+    pub async fn list_applications(
+        &self,
+        employer_id: String,
+    ) -> Result<Value, GenericClientError> {
+        if employer_id.is_empty() {
+            return Err(GenericClientError::ValidationError(
+                "employer_id cannot be empty".to_string(),
+            ));
+        }
+
+        let response = self
+            .client
+            .get(format!(
+                "https://info-car.pl/api/stc/employers/{employer_id}/applications/"
+            ))
+            .bearer_auth(self.get_token()?)
+            .send()
+            .await?;
+
+        log::debug!("{response:?}");
+
+        Ok(handle_response(response)?.json().await?)
+    }
+
+    pub async fn add_employee(
+        &self,
+        employer_id: String,
+        employee: AddEmployeeRequest,
+    ) -> Result<Value, GenericClientError> {
+        if employer_id.is_empty() {
+            return Err(GenericClientError::ValidationError(
+                "employer_id cannot be empty".to_string(),
+            ));
+        }
+
+        let response = self
+            .client
+            .post(format!(
+                "https://info-car.pl/api/stc/employers/{employer_id}/employees/"
+            ))
+            .header(
+                "Content-Type",
+                "application/vnd.pwpw.infocar.stc.public.v1+json",
+            )
+            .bearer_auth(self.get_token()?)
+            .json(&employee)
+            .send()
+            .await?;
+
+        log::debug!("{response:?}");
+
+        Ok(handle_response(response)?.json().await?)
+    }
 }
 
 impl Default for Client {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_list_applications() {
+        dotenvy::dotenv().ok();
+        let current_dir = std::env::current_dir().expect("Failed to get current directory");
+        println!("Current directory: {}", current_dir.display());
+
+        let username = dotenvy::var("USER_HANDLER").expect("USER_HANDLER not set in .env");
+        let password = dotenvy::var("PASS").expect("PASS not set in .env");
+        let employer_id = dotenvy::var("EMPLOYER_ID").expect("EMPLOYER_ID not set in .env");
+
+        let mut client = Client::new();
+        if let Err(e) = client.login(&username, &password).await {
+            panic!("Login failed: {:?}", e);
+        }
+        println!("Login successful, token acquired");
+
+        let result = client.list_applications(employer_id).await;
+        assert!(
+            result.is_ok(),
+            "list_applications failed: {:?}",
+            result.err()
+        );
+
+        let applications = result.unwrap();
+        println!("Applications: {}", applications);
+    }
+
+    #[tokio::test]
+    async fn test_add_employee() {
+        dotenvy::dotenv().ok();
+
+        let username = dotenvy::var("USER_HANDLER").expect("USER_HANDLER not set in .env");
+        let password = dotenvy::var("PASS").expect("PASS not set in .env");
+        let employer_id = dotenvy::var("EMPLOYER_ID").expect("EMPLOYER_ID not set in .env");
+
+        let mut client = Client::new();
+        if let Err(e) = client.login(&username, &password).await {
+            panic!("Login failed: {:?}", e);
+        }
+        println!("Login successful, token acquired");
+        let employee = AddEmployeeRequest::new(
+            "Jesus".to_string(),
+            "Christ".to_string(),
+            "aaa 111111".to_string(),
+            "UA".to_string(),
+            "PL".to_string(),
+            "11111111111".to_string(),
+            "0000-12-25".to_string(),
+        );
+        let result = client.add_employee(employer_id, employee).await;
+        assert!(result.is_ok(), "add_employee failed: {:?}", result.err());
+
+        let response = result.unwrap();
+        println!("Add employee response: {}", response);
     }
 }
