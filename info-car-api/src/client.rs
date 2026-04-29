@@ -23,7 +23,6 @@ pub struct Client {
     client: reqwest::Client,
     token: Option<String>,
     pub token_expire_date: Option<DateTime<Utc>>,
-    turnstile_token: Option<String>,
 }
 
 impl Client {
@@ -36,23 +35,8 @@ impl Client {
                 .unwrap(),
             token: None,
             token_expire_date: None,
-            turnstile_token: None,
         }
     }
-
-    pub fn set_turnstile_token(&mut self, token: Option<String>) {
-        self.turnstile_token = token;
-    }
-
-    fn add_turnstile_header(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
-        if let Some(token) = &self.turnstile_token {
-            if !token.is_empty() {
-                return request.header("X-CF-Turnstile", token);
-            }
-        }
-        request
-    }
-
     pub fn set_token(&mut self, token: String) {
         self.token = Some(token);
     }

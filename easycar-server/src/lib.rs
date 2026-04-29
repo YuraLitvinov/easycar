@@ -4,8 +4,6 @@ use axum::{Json, Router, extract::State, http::StatusCode, routing::post};
 use info_car_api::{client::Client, types::AddEmployeeRequest};
 use tokio::sync::Mutex;
 
-mod vault;
-
 #[derive(Clone)]
 pub struct AppState {
     pub client: Arc<Mutex<Client>>,
@@ -44,12 +42,9 @@ pub async fn build_state(
     username: String,
     password: String,
     employer_id: String,
-    dev_mode: bool,
 ) -> Result<AppState, Box<dyn std::error::Error + Send + Sync>> {
     let mut client = Client::new();
-    if !dev_mode {
-        client.login(&username, &password).await?;
-    }
+    client.login(&username, &password).await?;
 
     Ok(AppState {
         client: Arc::new(Mutex::new(client)),
@@ -58,35 +53,13 @@ pub async fn build_state(
 }
 
 pub async fn build_state_from_env() -> Result<AppState, Box<dyn std::error::Error + Send + Sync>> {
-    let dev_mode = std::env::var("DEV_MODE")
-        .map(|v| v == "true")
-        .unwrap_or(false);
+    let (username, password, employer_id) = (
+        std::env::var("EASYCAR_USERNAME")?,
+        std::env::var("EASYCAR_PASSWORD")?,
+        std::env::var("EASYCAR_EMPLOYER_ID")?,
+    );
 
-    let (username, password, employer_id) = if dev_mode {
-        (
-            "dev".to_string(),
-            "dev".to_string(),
-            "dev_employer".to_string(),
-        )
-    } else {
-        match (std::env::var("VAULT_ADDR"), std::env::var("VAULT_TOKEN")) {
-            (Ok(addr), Ok(token)) => {
-                vault::VaultClient::new(addr, token)
-                    .get_infocar_credentials()
-                    .await?
-            }
-            _ => {
-                dotenvy::dotenv().ok();
-                (
-                    std::env::var("USERNAME")?,
-                    std::env::var("PASSWORD")?,
-                    std::env::var("EMPLOYER_ID")?,
-                )
-            }
-        }
-    };
-
-    build_state(username, password, employer_id, dev_mode).await
+    build_state(username, password, employer_id).await
 }
 
 pub async fn run_server(
