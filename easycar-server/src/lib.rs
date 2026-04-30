@@ -10,6 +10,10 @@ pub struct AppState {
     pub employer_id: String,
 }
 
+fn require_env(key: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    std::env::var(key).map_err(|_| format!("required environment variable `{key}` is not set").into())
+}
+
 async fn create_employee(
     State(state): State<AppState>,
     Json(body): Json<AddEmployeeRequest>,
@@ -20,11 +24,26 @@ async fn create_employee(
     {
         return StatusCode::OK;
     }
+
+    let username = match require_env("USER_HANDLER") {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::error!("{e}");
+            return StatusCode::INTERNAL_SERVER_ERROR;
+        }
+    };
+    let password = match require_env("PASS") {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::error!("{e}");
+            return StatusCode::INTERNAL_SERVER_ERROR;
+        }
+    };
+
     let mut client = Client::new();
-    let username = dotenvy::var("USER_HANDLER").expect("USER_HANDLER not set in .env");
-    let password = dotenvy::var("PASS").expect("PASS not set in .env");
     if let Err(e) = client.login(&username, &password).await {
-        panic!("Login failed: {:?}", e);
+        tracing::error!("easycar login failed: {e:?}");
+        return StatusCode::INTERNAL_SERVER_ERROR;
     }
 
     let result = client.add_employee(state.employer_id, body).await;
@@ -53,11 +72,9 @@ pub async fn build_state(
 }
 
 pub async fn build_state_from_env() -> Result<AppState, Box<dyn std::error::Error + Send + Sync>> {
-    let (username, password, employer_id) = (
-        std::env::var("EASYCAR_USERNAME")?,
-        std::env::var("EASYCAR_PASSWORD")?,
-        std::env::var("EASYCAR_EMPLOYER_ID")?,
-    );
+    let username = require_env("EASYCAR_USERNAME")?;
+    let password = require_env("EASYCAR_PASSWORD")?;
+    let employer_id = require_env("EASYCAR_EMPLOYER_ID")?;
 
     build_state(username, password, employer_id).await
 }
