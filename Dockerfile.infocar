@@ -1,38 +1,27 @@
-# Build Stage
+# ── Stage 1: build ────────────────────────────────────────────────────────────
 FROM rust:1.93-slim-trixie AS builder
 
 WORKDIR /app
 
-# Install dependencies for building
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the entire workspace since it might depend on other crates
 COPY . .
-
-# Build the easycar-server crate
 RUN cargo build --release -p easycar-server
 
-# Runtime Stage
-FROM debian:trixie-slim AS runtime
+# ── Stage 2: runtime ──────────────────────────────────────────────────────────
+FROM gcr.io/distroless/cc-debian13:nonroot AS runtime
 
 WORKDIR /app
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    openssl \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy the binary from the builder stage
-COPY --from=builder /app/target/release/easycar-server /app/easycar-server
+COPY --from=builder /app/target/release/easycar-server .
 
 EXPOSE 3000
 
 ENV PORT=3000
 ENV RUST_LOG=info
 
-CMD ["/app/easycar-server"]
+CMD ["./easycar-server"]
