@@ -61,8 +61,6 @@ impl InfoCarClient {
             .await?;
         let user_info = client.user_info().await?;
 
-        log::debug!("Got user info: {user_info:?}");
-
         Ok(Self {
             client,
             user_data,

@@ -1,4 +1,4 @@
-use easycar_server::{build_state_from_env, run_server};
+use easycar_server::{AppState, run_server};
 
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -11,12 +11,14 @@ async fn main() {
 
     dotenvy::dotenv().ok();
 
-    let state = match build_state_from_env().await {
-        Ok(s) => s,
-        Err(e) => {
-            tracing::error!("startup failed: {e}");
-            std::process::exit(1);
-        }
+    let employer_id =
+        std::env::var("EASYCAR_EMPLOYER_ID").expect("EASYCAR_EMPLOYER_ID must be set");
+    let username = std::env::var("EASYCAR_USER").expect("EASYCAR_USER must be set");
+    let password = std::env::var("EASYCAR_PASSWORD").expect("EASYCAR_PASSWORD must be set");
+    let state = AppState {
+        employer_id,
+        username,
+        password,
     };
 
     let port = std::env::var("PORT").unwrap_or_else(|_| "3000".to_string());
