@@ -116,14 +116,11 @@ impl Client {
             ("_csrf", &csrf_token),
         ];
 
-        let login_response = self
-            .client
+        self.client
             .post("https://info-car.pl/oauth2/login")
             .form(&form_params)
             .send()
             .await?;
-
-        dbg!("Login response: {:?}", login_response);
 
         self.refresh_token().await?;
 
@@ -412,7 +409,7 @@ mod tests {
             "aaa 111111".to_string(),
             "UA".to_string(),
             "PL".to_string(),
-            "11111111111".to_string(),
+            Some("11111111111".to_string()),
             "0000-12-25".to_string(),
         );
         let result = client.add_employee(employer_id, employee).await;

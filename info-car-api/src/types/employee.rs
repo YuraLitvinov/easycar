@@ -19,7 +19,7 @@ impl AddEmployeeRequest {
         driving_license_serial_number: String,
         driving_license_authority_country: String,
         residence_country_code: String,
-        pesel: String,
+        pesel: Option<String>,
         birth_date: String,
     ) -> Self {
         Self {
@@ -39,7 +39,7 @@ impl AddEmployeeRequest {
             driver_details_dto: DriverDetails {
                 birth_date,
                 driving_license_dto: DrivingLicense {
-                    serial_number: driving_license_serial_number,
+                    serial_number: if driving_license_serial_number.is_empty() { None } else { Some(driving_license_serial_number) },
                     authority_country: driving_license_authority_country,
                     ..Default::default()
                 },
@@ -56,8 +56,8 @@ pub struct Person {
     pub first_name: String,
     pub middle_name: Option<String>,
     pub last_name: String,
-    pub pesel: String,
-    pub has_no_pesel: Option<bool>,
+    pub pesel: Option<String>,
+    pub has_no_pesel: Option<serde_json::Value>,
     pub personal_document_type: Option<String>,
     pub personal_document_number: Option<String>,
     pub personal_document_issuing_authority: Option<String>,
@@ -101,7 +101,7 @@ pub struct DrivingLicense {
     pub release_date: Option<String>,
     pub expiration_date: Option<String>,
     pub document_number: Option<String>,
-    pub serial_number: String,
+    pub serial_number: Option<String>,
     pub issuing_authority: Option<String>,
     pub valid_indefinitely: Option<bool>,
 }
