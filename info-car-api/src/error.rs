@@ -17,6 +17,8 @@ pub enum GenericClientError {
     JWTError(#[from] JWTError),
     #[error("Validation error: {0}")]
     ValidationError(String),
+    #[error("InfoCar API error (HTTP {status}): {body}")]
+    ApiError { status: u16, body: String },
 }
 
 #[derive(Error, Debug)]

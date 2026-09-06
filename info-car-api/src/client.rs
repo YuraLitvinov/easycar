@@ -352,7 +352,16 @@ impl Client {
             .send()
             .await?;
 
-        Ok(handle_response(response)?.json().await?)
+        let response = handle_response(response)?;
+        let status = response.status();
+        let body: serde_json::Value = response.json().await?;
+        if !status.is_success() {
+            return Err(GenericClientError::ApiError {
+                status: status.as_u16(),
+                body: body.to_string(),
+            });
+        }
+        Ok(body)
     }
 }
 

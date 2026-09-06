@@ -1,7 +1,8 @@
 use axum::{Json, Router, extract::State, http::StatusCode, routing::post};
-use info_car_api::{client::Client, types::AddEmployeeRequest};
-use serde_json::json;
+use info_car_api::{client::Client, error::GenericClientError, types::AddEmployeeRequest};
+use serde_json::{Value, json};
 use tokio::signal;
+
 #[derive(Clone)]
 pub struct AppState {
     pub employer_id: String,
@@ -12,26 +13,47 @@ pub struct AppState {
 async fn create_employee(
     State(state): State<AppState>,
     Json(body): Json<AddEmployeeRequest>,
-) -> StatusCode {
+) -> (StatusCode, Json<Value>) {
     if std::env::var("DEV_STATE").unwrap_or("false".to_string()) == "true" {
         let jbody = json!(body);
         println!("{}\n{:#?}", jbody, body);
-        return StatusCode::ACCEPTED;
+        return (StatusCode::ACCEPTED, Json(json!({"detail": "dev mode accepted"})));
     }
+
     let mut client = Client::new();
     if let Err(e) = client.login(&state.username, &state.password).await {
         tracing::error!("easycar login failed: {e:?}");
-        return StatusCode::INTERNAL_SERVER_ERROR;
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"detail": "Login to InfoCar failed"})),
+        );
     }
 
     let result = client.add_employee(state.employer_id, body).await;
-    tracing::info!("Add employee result: {:?}", result);
 
     if let Err(e) = client.logout().await {
         tracing::error!("easycar logout failed: {e:?}");
     }
 
-    StatusCode::CREATED
+    match result {
+        Ok(_) => (StatusCode::CREATED, Json(json!({"detail": "Employee submitted"}))),
+        Err(GenericClientError::ValidationError(msg)) => {
+            tracing::warn!("add_employee validation error: {msg}");
+            (StatusCode::BAD_REQUEST, Json(json!({"detail": msg})))
+        }
+        Err(GenericClientError::ApiError { status, body }) => {
+            tracing::warn!("InfoCar API error {status}: {body}");
+            let code = StatusCode::from_u16(status).unwrap_or(StatusCode::BAD_GATEWAY);
+            (code, Json(json!({"detail": body})))
+        }
+        Err(e) => {
+            tracing::error!("add_employee failed: {e:?}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"detail": "Failed to submit employee to InfoCar"})),
+            )
+        }
+    }
 }
 
 pub fn build_router(state: AppState) -> Router {
